@@ -1,62 +1,65 @@
 <?php
-	if ($_SERVER["REQUEST_METHOD"] == "POST") {
-		$name = strip_tags(trim($_POST["name"]));
-		$name = str_replace(array("\r","\n"),array(" "," "),$name);
-		$email = filter_var(trim($_POST["email"]), FILTER_SANITIZE_EMAIL);
-		$message = trim($_POST["message"]);
-		if (isset($_POST['g-recaptcha-response'])) {
-			$captcha = $_POST['g-recaptcha-response'];
-		}
-		if (!$captcha) {
-			http_response_code(400);
-			echo 'Please check the reCAPTCHA.';
-			exit;
-		}
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (empty($_POST["name"])) {
+        http_response_code(400);
+        echo "Please enter your name.";
+        exit;
+    } else if (empty($_POST["email"])) {
+        http_response_code(400);
+        echo "Please enter your email address.";
+        exit;
+    } else if (!filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo "Please enter a valid email address.";
+        exit;
+    } else if (empty($_POST["message"])) {
+        http_response_code(400);
+        echo "Please enter a message.";
+        exit;
+    } else if (empty($_POST['g-recaptcha-response'])) {
+        http_response_code(400);
+        echo 'Please check the reCAPTCHA.';
+        exit;
+    }
 
-		if (empty($name) OR empty($email) OR empty($message) OR !filter_var($email, FILTER_VALIDATE_EMAIL) OR empty($captcha)) {
-			http_response_code(400);
-			echo "Oops! There was a problem with your submission. Please complete the form and try again.";
-			exit;
-		}
+    $name = strip_tags(trim($_POST["name"]));
+    $name = str_replace(array("\r", "\n"), array(" ", " "), $name);
+    $email = filter_var(trim($_POST["email"]), FILTER_SANITIZE_EMAIL);
+    $message = trim($_POST["message"]);
+    $recipient = "RECIPIENTEMAIL";
+    $subject = "Contact Form Message";
+    $content = "Name: $name\n";
+    $content .= "Email: $email\n\n";
+    $content .= "Message:\n$message\n";
 
-		$recipient = "EMAIL";
+    function isValid() {
+        try {
+            $url = 'https://www.google.com/recaptcha/api/siteverify';
+            $data = ['secret' => 'YOURSECRET', 'response' => $_POST['g-recaptcha-response'], 'remoteip' => $_SERVER['REMOTE_ADDR']];
+            $options = ['http' => ['header' => "Content-type: application/x-www-form-urlencoded\r\n", 'method' => 'POST', 'content' => http_build_query($data)]];
+            $context  = stream_context_create($options);
+            $result = file_get_contents($url, false, $context);
+            return json_decode($result) -> success;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
 
-		$subject = "Contact Form Message";
+    $response = isValid();
 
-		$email_content = "Name: $name\n";
-		$email_content .= "Email: $email\n\n";
-		$email_content .= "Message:\n$message\n";
-
-		function isValid() {
-			try {
-				$url = 'https://www.google.com/recaptcha/api/siteverify';
-				$data = ['secret'   => 'YOURSECRET','response' => $_POST['g-recaptcha-response'],'remoteip' => $_SERVER['REMOTE_ADDR']];
-				$options = ['http' => ['header' => "Content-type: application/x-www-form-urlencoded\r\n",'method' => 'POST','content' => http_build_query($data)]];
-				$context  = stream_context_create($options);
-				$result = file_get_contents($url, false, $context);
-				return json_decode($result)->success;
-			}
-			catch (Exception $e) {
-				return null;
-			}
-		}
-
-		$response = isValid();
-
-		if ($response !== true) {
-			http_response_code(400);
-			echo "You are a robot!";
-		} else {
-			if (mail($recipient, $subject, $email_content)) {
-			http_response_code(200);
-			echo "Thank you! Your message has been sent. I will get back to you as soon as possible.";
-			} else {
-			http_response_code(500);
-			echo "Oops! Something went wrong and we couldn't send your message.";
-			}
-		}
-	} else {
-		http_response_code(403);
-		echo "There was a problem with your submission, please try again.";
-	}
-?>
+    if ($response !== true) {
+        http_response_code(400);
+        echo "You are a robot!";
+    } else {
+        if (mail($recipient, $subject, $content)) {
+            http_response_code(200);
+            echo "Thank you! Your message has been sent. I will get back to you as soon as possible.";
+        } else {
+            http_response_code(500);
+            echo "Oops! An error occurred and your message could not be sent.";
+        }
+    }
+} else {
+    http_response_code(403);
+    echo "Oops! There was a problem with your submission. Please try again.";
+}
