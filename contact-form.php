@@ -8,7 +8,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 		http_response_code(400);
 		echo "Please enter your email address.";
 		exit;
-	} else if (!filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)) {
+	} else if (!filter_var(trim($_POST["email"]), FILTER_VALIDATE_EMAIL)) {
 		http_response_code(400);
 		echo "Please enter a valid email address.";
 		exit;
@@ -33,34 +33,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 	$time = date('H:i:s');
 	$content = "You have received a new message from the contact form on your website.\n\nName: $name\nEmail: $from\n\nMessage:\n$message\n\nThis message was sent from $address on $date at $time.";
 
-	function isValid() {
-		try {
-			$url = 'https://www.google.com/recaptcha/api/siteverify';
-			$data = ['secret' => 'YOURSECRET', 'response' => $_POST['g-recaptcha-response'], 'remoteip' => $_SERVER['REMOTE_ADDR']];
-			$options = ['http' => ['header' => "Content-type: application/x-www-form-urlencoded\r\n", 'method' => 'POST', 'content' => http_build_query($data)]];
-			$context  = stream_context_create($options);
-			$result = file_get_contents($url, false, $context);
-			return json_decode($result) -> success;
-		} catch (Exception $e) {
-			return null;
-		}
-	}
-
-	$response = isValid();
+	$response = isValid($address);
 
 	if ($response !== true) {
 		http_response_code(400);
 		echo "You are a robot!";
+	} else if (mail($recipient, $subject, $content)) {
+		http_response_code(200);
+		echo "Thank you! Your message has been sent. I will get back to you as soon as possible.";
 	} else {
-		if (mail($recipient, $subject, $content)) {
-			http_response_code(200);
-			echo "Thank you! Your message has been sent. I will get back to you as soon as possible.";
-		} else {
-			http_response_code(500);
-			echo "Oops! An error occurred and your message could not be sent.";
-		}
+		http_response_code(500);
+		echo "Oops! An error occurred and your message could not be sent.";
 	}
 } else {
 	http_response_code(403);
 	echo "Oops! There was a problem with your submission. Please try again.";
+}
+
+function isValid($address) {
+	try {
+		$url = 'https://www.google.com/recaptcha/api/siteverify';
+		$data = ['secret' => 'YOURSECRET', 'response' => $_POST['g-recaptcha-response'], 'remoteip' => $address];
+		$options = ['http' => ['header' => "Content-type: application/x-www-form-urlencoded\r\n", 'method' => 'POST', 'content' => http_build_query($data)]];
+		$context  = stream_context_create($options);
+		$result = file_get_contents($url, false, $context);
+		return json_decode($result) -> success;
+	} catch (Exception $e) {
+		return null;
+	}
 }
