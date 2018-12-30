@@ -13,7 +13,7 @@ $(function() {
 			data: formData
 		})
 			.done(function(response) {
-				$(form).reset();
+				document.getElementById('contact-form').reset();
 				grecaptcha.reset();
 				$(formMessage).removeClass('text-danger');
 				$(formMessage).addClass('text-success');
